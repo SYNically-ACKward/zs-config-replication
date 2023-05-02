@@ -1,0 +1,17 @@
+[OAUTH]
+client_id = ""
+client_secret = ""
+scope = ""
+token_url = ""
+
+[PARENT]
+cloud_id = ""
+organization_id = ""
+api_key = ""
+username = ""
+
+[SUB1]
+cloud_id = ""
+organization_id = ""
+api_key = ""
+username = ""
