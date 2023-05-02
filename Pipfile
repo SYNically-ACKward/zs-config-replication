@@ -12,6 +12,8 @@ idna = "==3.4"
 urllib3 = "==1.26.15"
 
 [dev-packages]
+flake8 = "*"
+icecream = "*"
 
 [requires]
 python_version = "3"

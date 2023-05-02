@@ -161,3 +161,6 @@ cython_debug/
 
 # Configuration Files
 *.toml
+
+# Scratch Files
+scratch.py
