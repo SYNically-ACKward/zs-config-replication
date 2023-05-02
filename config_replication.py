@@ -82,7 +82,7 @@ def get_policy(apikey, username, password):
                               headers=header, verify=False).json()
         time.sleep(1)
 
-        return FW_Filtering_no_default_rules, BL_URLs
+        return [FW_Filtering_no_default_rules, BL_URLs]
 
 
 def update_policy(apikey, username, password, current_master_policy):
@@ -155,17 +155,18 @@ def update_policy(apikey, username, password, current_master_policy):
 
         time.sleep(1)
 
-        # # performing post to update blacklist URLs for child tenants
-        # payload = json.dumps(current_master_policy[1]).replace("'", '"')
-        # time.sleep(1)
+        # performing post to update blacklist URLs for child tenants
+        payload = json.dumps(current_master_policy[1]).replace("'", '"')
+        ic(payload)
+        time.sleep(1)
 
-        # update_bl_url = session.put(f"{zscaler_base_url}security/advanced",
-        #                             headers=header, data=payload)
+        update_bl_url = session.put(f"{zscaler_base_url}security/advanced",
+                                    headers=header, data=payload)
 
-        # print(update_bl_url)
-        # # activating change
-        # session.post(f"{zscaler_base_url}status/activate", data="",
-        #              headers=header).json()
+        print(update_bl_url)
+        # activating change
+        session.post(f"{zscaler_base_url}status/activate", data="",
+                     headers=header).json()
 
 
 if __name__ == '__main__':
