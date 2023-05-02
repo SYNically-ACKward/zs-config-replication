@@ -5,7 +5,7 @@ import tomli
 from icecream import ic
 
 # Enable IC debugging
-ic.disable()
+ic.enable()
 
 # Load TOML config file
 with open('config.toml', "rb") as cf:
@@ -27,7 +27,6 @@ def obfuscateApiKey(apikey):
     for j in range(0, len(str(r)), 1):
         key += seed[int(str(r)[j])+2]
 
-    ic("Timestamp:", now, "\tKey", key)
     return now, key
 
 
@@ -68,7 +67,6 @@ def get_policy(apikey, username, password):
         # performing GET to firewallFilteringRules endpoint and printing result
         FW_Filtering = session.get(f"{zscaler_base_url}firewallFilteringRules",
                                    headers=header, verify=False).json()
-        ic(FW_Filtering)
         FW_Filtering_no_default_rules = [
             x for x in FW_Filtering if (
                 'Default Firewall Filtering Rule' not in x.get('name') and
@@ -78,7 +76,6 @@ def get_policy(apikey, username, password):
                 'HTTP' not in x.get('name')
             )
         ]
-        ic(FW_Filtering_no_default_rules)
         time.sleep(1)
         # performing get to blacklist URLs
         BL_URLs = session.get(f"{zscaler_base_url}security/advanced",
@@ -118,71 +115,45 @@ def update_policy(apikey, username, password, current_master_policy):
 
         session.cookies.set("JSESSIONID", response)
 
-        payload = json.dumps(current_master_policy[0])
-        ic(payload)
-        new_payload = current_master_policy[0][0]
-        ic(new_payload)
-        # try:
-        #     del new_payload['id']
-        # except:
-        #     print("no action needed")
-        # if 'destIpCategories' in str(new_payload):
-        #     del new_payload['destIpCategories']
-        # if 'resCategories' in str(new_payload):
-        #     del new_payload['resCategories']
-        # if 'destCountries' in str(new_payload):
-        #     del new_payload['destCountries']
+        network_services_response = session.get(
+            f"{zscaler_base_url}networkServices",
+            headers=header, verify=False).json()
+        new_ruleset = []
+        for rule in current_master_policy[0]:
+            del rule['id']
 
-        # new_payload.update({"description": "test"})
-        # ic(json.dumps([new_payload]))
-        # network_services_response = session.get(
-        #     f"{zscaler_base_url}networkServices",
-        #     headers=header, data={}, verify=False).json()
+            if 'destIpCategories' in str(rule):
+                del rule['destIpCategories']
 
-        # ic(network_services_response)
+            if 'resCategories' in str(rule):
+                del rule['resCategories']
 
-        # for rule in [new_payload]:
-        #     print(json.dumps(rule))
+            if 'destCountries' in str(rule):
+                del rule['destCountries']
 
-        #     ic(rule['nwServices'][0])
+            if 'nwServices' in rule:
+                for nwService in rule['nwServices']:
+                    for service in network_services_response:
+                        if service['name'] == nwService['name']:
+                            nwService['id'] = service['id']
 
-        #     for service in network_services_response:
+            new_ruleset.append(rule)
 
-        #         if 'nwServices' in str(rule):
+        for rule in new_ruleset:
+            firewallFilteringRulesPost = session.post(
+                f"{zscaler_base_url}firewallFilteringRules",
+                data=json.dumps(rule), headers=header)
+            if 'code' in firewallFilteringRulesPost.content.decode():
+                print(f"Error with Rule Name: {rule['name']}")
+                print(f"Error: {firewallFilteringRulesPost.json()['code']}")
+                print(f"Error: {firewallFilteringRulesPost.json()['message']}")
+            time.sleep(1)
 
-        #             if str(rule['nwServices'][0]['name']) in str(service['name']):
-        #                 print(service)
+        # activating change
+        session.post(f"{zscaler_base_url}status/activate",
+                     data="", headers=header).json()
 
-        #                 rule_data = {
-        #                             "accessControl": rule['accessControl'],
-        #                             "enableFullLogging": rule['enableFullLogging'],
-        #                             "name": rule['name'],
-        #                             "order": rule['order'],
-        #                             "rank": rule['rank'],
-        #                             "action": rule['action'],
-        #                             "state": rule['state'],
-        #                             "nwServices": [{"id": service['id'],
-        #                                             "name": rule['nwServices'][0]['name'],
-        #                                             "isNameL10nTag": rule['nwServices'][0]['isNameL10nTag']}],
-        #                             "predefined": rule['predefined'],
-        #                             "defaultRule": rule['defaultRule'],
-        #                             "description": rule['description']
-        #                             }
-
-        #                 # del rule['nwServices']
-        #                 # print(rule)
-
-        #             firewallFilteringRulesPost = session.post(
-        #                 f"{zscaler_base_url}firewallFilteringRules",
-        #                 data=json.dumps(rule_data), headers=header).json()
-        #             time.sleep(1)
-        #             print(firewallFilteringRulesPost)
-
-        # # activating change
-        # session.post(f"{zscaler_base_url}status/activate",
-        #              data="", headers=header).json()
-
-        # time.sleep(1)
+        time.sleep(1)
 
         # # performing post to update blacklist URLs for child tenants
         # payload = json.dumps(current_master_policy[1]).replace("'", '"')
@@ -198,16 +169,13 @@ def update_policy(apikey, username, password, current_master_policy):
 
 
 if __name__ == '__main__':
-    ic([key for key in config.keys() if 'SUB' in key])
     while True:
         current_master_policy = get_policy(config['PARENT']['api_key'],
                                            config['PARENT']['username'],
                                            config['PARENT']['password'])
-        ic(current_master_policy)
         for tenant in [key for key in config.keys() if 'SUB' in key]:
             time.sleep(1)
             zscaler_base_url = f"https://zsapi.{config[f'{tenant}']['cloud_id']}/api/v1/" # noqa
-            print(zscaler_base_url)
             update_policy(config[f'{tenant}']['api_key'],
                           config[f'{tenant}']['username'],
                           config[f'{tenant}']['password'],
