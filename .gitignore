@@ -164,3 +164,4 @@ cython_debug/
 
 # Scratch Files
 scratch.py
+archive/*
