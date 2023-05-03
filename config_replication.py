@@ -117,7 +117,7 @@ def update_policy(apikey, username, password, current_master_policy):
 
         network_services_response = session.get(
             f"{zscaler_base_url}networkServices",
-            headers=header, verify=False).json()
+            headers=header).json()
         new_ruleset = []
         for rule in current_master_policy[0]:
             del rule['id']
