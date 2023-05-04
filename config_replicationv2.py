@@ -1,3 +1,4 @@
+from zia_talker.zia_talker import ZiaTalker
 import requests
 import json
 import time
