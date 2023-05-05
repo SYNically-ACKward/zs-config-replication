@@ -128,6 +128,21 @@ def get_tenant_labels(session, baseUrl: str) -> list:
                        headers=headers).json()
 
 
+def get_child_fw_ruleset(session, baseUrl: str) -> list:
+    FW_Filtering = session.get(f"{baseUrl}firewallFilteringRules",
+                               headers=headers).json()
+    FW_Filtering_no_default_rules = [
+        x for x in FW_Filtering if (
+            'Default Firewall Filtering Rule' not in x.get('name') and
+            'Zscaler Proxy Traffic' not in x.get('name') and
+            'Office 365 One Click Rule' not in x.get('name') and
+            'Recommended Firewall Rule' not in x.get('name') and
+            'HTTP' not in x.get('name')
+        )
+    ]
+    return FW_Filtering_no_default_rules
+
+
 def validate_child_labels(session, baseUrl: str) -> list:
     current_labels = session.get(f"{baseUrl}ruleLabels",
                                  headers=headers).json()
@@ -153,36 +168,36 @@ def create_tenant_labels(session, baseUrl: str):
                  data="", headers=headers).json()
 
 
-def build_child_fw_ruleset(session, policy: list, nwServcies: list, labels: list) -> list:
-    current_policy = copy.deepcopy(policy)
+def build_child_fw_ruleset(session, parent_policy: list, nwServcies: list,
+                           labels: list, current_policy: list) -> list:
+    parent_policy = copy.deepcopy(parent_policy)
     new_ruleset = []
-    for rule in current_policy:
-        del rule['id']
-        if 'destIpCategories' in str(rule):
-            del rule['destIpCategories']
-
-        if 'resCategories' in str(rule):
-            del rule['resCategories']
-
-        if 'destCountries' in str(rule):
-            del rule['destCountries']
-
-        if 'labels' in str(rule):
-            for rule_label in rule['labels']:
-                if rule_label['name'] != 'pscm-high' or 'pscm-low':
-                    del rule['labels']
-                else:
-                    for label in labels:
-                        if label['name'] == rule_label['name']:
-                            rule_label['id'] = label['id']
-
-        if 'nwServices' in rule:
-            for nwService in rule['nwServices']:
-                for service in nwServcies:
-                    if service['name'] == nwService['name']:
-                        nwService['id'] = service['id']
-        new_ruleset.append(rule)
-    ic(new_ruleset)
+    for rule in parent_policy:
+        if rule['name'] in [i['name'] for i in current_policy]:
+            print(f"Rule {rule['name']} already exists.")
+            pass
+        else:
+            del rule['id']
+            if 'destIpCategories' in str(rule):
+                del rule['destIpCategories']
+            if 'resCategories' in str(rule):
+                del rule['resCategories']
+            if 'destCountries' in str(rule):
+                del rule['destCountries']
+            if 'labels' in str(rule):
+                for rule_label in rule['labels']:
+                    if rule_label['name'] != 'pscm-high' or 'pscm-low':
+                        del rule['labels']
+                    else:
+                        for label in labels:
+                            if label['name'] == rule_label['name']:
+                                rule_label['id'] = label['id']
+            if 'nwServices' in rule:
+                for nwService in rule['nwServices']:
+                    for service in nwServcies:
+                        if service['name'] == nwService['name']:
+                            nwService['id'] = service['id']
+            new_ruleset.append(rule)
     return new_ruleset
 
 
@@ -239,7 +254,9 @@ if __name__ == "__main__":
                                                           get_tenant_nwServices(child_session,
                                                                                 config[f'{tenant}']['baseUrl']),
                                                           get_tenant_labels(child_session,
-                                                                            config[f'{tenant}']['baseUrl']))
+                                                                            config[f'{tenant}']['baseUrl']),
+                                                          get_child_fw_ruleset(child_session,
+                                                                               config[f'{tenant}']['baseUrl']))
 
                 apply_child_fw_ruleset(child_session,
                                        config[f'{tenant}']['baseUrl'],
