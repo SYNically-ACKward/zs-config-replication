@@ -10,7 +10,7 @@ import sys
 from icecream import ic
 
 # Enable IC debugging
-ic.disable()
+ic.enable()
 
 # Load TOML config file
 with open('config.toml', "rb") as cf:
@@ -95,17 +95,12 @@ def check_for_changes(session, baseUrl: str):
 def get_fw_policy(session, baseUrl: str) -> list:
     FW_Filtering = session.get(f"{baseUrl}firewallFilteringRules",
                                headers=headers).json()
-    FW_Filtering_no_default_rules = [
+    FW_Filtering_no_default = [
         x for x in FW_Filtering if (
-            'Default Firewall Filtering Rule' not in x.get('name') and
-            'Zscaler Proxy Traffic' not in x.get('name') and
-            'Office 365 One Click Rule' not in x.get('name') and
-            'Recommended Firewall Rule' not in x.get('name') and
-            'HTTP' not in x.get('name')
+            'Default Firewall Filtering Rule' not in x.get('name')
         )
     ]
-
-    return FW_Filtering_no_default_rules
+    return sorted(FW_Filtering_no_default, key=lambda x: x['order'])
 
 
 def get_url_blacklist(session, baseUrl: str) -> dict:
@@ -131,16 +126,12 @@ def get_tenant_labels(session, baseUrl: str) -> list:
 def get_child_fw_ruleset(session, baseUrl: str) -> list:
     FW_Filtering = session.get(f"{baseUrl}firewallFilteringRules",
                                headers=headers).json()
-    FW_Filtering_no_default_rules = [
+    FW_Filtering_no_default = [
         x for x in FW_Filtering if (
-            'Default Firewall Filtering Rule' not in x.get('name') and
-            'Zscaler Proxy Traffic' not in x.get('name') and
-            'Office 365 One Click Rule' not in x.get('name') and
-            'Recommended Firewall Rule' not in x.get('name') and
-            'HTTP' not in x.get('name')
+            'Default Firewall Filtering Rule' not in x.get('name')
         )
     ]
-    return FW_Filtering_no_default_rules
+    return sorted(FW_Filtering_no_default, key=lambda x: x['order'])
 
 
 def validate_child_labels(session, baseUrl: str) -> list:
@@ -174,7 +165,7 @@ def build_child_fw_ruleset(session, parent_policy: list, nwServcies: list,
     new_ruleset = []
     for rule in parent_policy:
         if rule['name'] in [i['name'] for i in current_policy]:
-            print(f"Rule {rule['name']} already exists.")
+            print(f"Rule {rule['name']} already exists at location {rule['order']}.")
             pass
         else:
             del rule['id']
@@ -198,7 +189,7 @@ def build_child_fw_ruleset(session, parent_policy: list, nwServcies: list,
                         if service['name'] == nwService['name']:
                             nwService['id'] = service['id']
             new_ruleset.append(rule)
-    return new_ruleset
+    return sorted(new_ruleset, key=lambda x: x['order'])
 
 
 def apply_child_fw_ruleset(session, baseUrl: str, fw_ruleset):
