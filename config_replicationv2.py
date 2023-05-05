@@ -118,7 +118,42 @@ def get_tenant_nwServices(session, baseUrl: str) -> dict:
                        headers=headers).json()
 
 
-def build_child_fw_ruleset(session, baseUrl: str, policy: list, nwServcies: dict) -> list:
+def get_tenant_locations(session, baseUrl: str) -> list:
+    return session.get(f"{baseUrl}locations",
+                       headers=headers).json
+
+
+def get_tenant_labels(session, baseUrl: str) -> list:
+    return session.get(f"{baseUrl}ruleLabels",
+                       headers=headers).json()
+
+
+def validate_child_labels(session, baseUrl: str) -> list:
+    current_labels = session.get(f"{baseUrl}ruleLabels",
+                                 headers=headers).json()
+    if 'pscm-high' and 'pscm-low' in [label['name'] for label in current_labels]:
+        pass
+    else:
+        create_tenant_labels(session, baseUrl)
+
+
+def create_tenant_labels(session, baseUrl: str):
+    label_data = [{
+        'name': 'pscm-high',
+        'description': 'pscm-high'
+    }, {
+        'name': 'pscm-low',
+        'description': 'pscm-low'
+    }]
+    for label in label_data:
+        session.post(f"{baseUrl}ruleLabels",
+                     data=json.dumps(label), headers=headers)
+        time.sleep(1)
+    session.post(f"{baseUrl}status/activate",
+                 data="", headers=headers).json()
+
+
+def build_child_fw_ruleset(session, policy: list, nwServcies: list, labels: list) -> list:
     current_policy = copy.deepcopy(policy)
     new_ruleset = []
     for rule in current_policy:
@@ -132,6 +167,15 @@ def build_child_fw_ruleset(session, baseUrl: str, policy: list, nwServcies: dict
         if 'destCountries' in str(rule):
             del rule['destCountries']
 
+        if 'labels' in str(rule):
+            for rule_label in rule['labels']:
+                if rule_label['name'] != 'pscm-high' or 'pscm-low':
+                    del rule['labels']
+                else:
+                    for label in labels:
+                        if label['name'] == rule_label['name']:
+                            rule_label['id'] = label['id']
+
         if 'nwServices' in rule:
             for nwService in rule['nwServices']:
                 for service in nwServcies:
@@ -139,7 +183,6 @@ def build_child_fw_ruleset(session, baseUrl: str, policy: list, nwServcies: dict
                         nwService['id'] = service['id']
         new_ruleset.append(rule)
     ic(new_ruleset)
-    ic(tenant)
     return new_ruleset
 
 
@@ -189,11 +232,14 @@ if __name__ == "__main__":
                                                      config[f'{tenant}']['baseUrl']
                                                      )
 
+                validate_child_labels(child_session, config[f'{tenant}']['baseUrl'])
+
                 child_fw_ruleset = build_child_fw_ruleset(child_session,
-                                                          config[f'{tenant}']['baseUrl'],
                                                           parent_fw_policy,
                                                           get_tenant_nwServices(child_session,
-                                                                                config[f'{tenant}']['baseUrl']))
+                                                                                config[f'{tenant}']['baseUrl']),
+                                                          get_tenant_labels(child_session,
+                                                                            config[f'{tenant}']['baseUrl']))
 
                 apply_child_fw_ruleset(child_session,
                                        config[f'{tenant}']['baseUrl'],
@@ -210,24 +256,3 @@ if __name__ == "__main__":
             time.sleep(300)
 
     # TESTING BLOCK
-    # parentSession = authenticate_session(config['PARENT']['api_key'],
-    #                                      config['PARENT']['username'],
-    #                                      config['PARENT']['password'],
-    #                                      config['PARENT']['baseUrl'])
-    # changes = check_for_changes(parentSession, config['PARENT']['baseUrl'])
-    # ic(changes)
-    # parent_fw_policy = get_fw_policy(parentSession,
-    #                                     config['PARENT']['baseUrl'])
-    # for tenant in [key for key in config.keys() if 'SUB' in key]:
-    #     child_session = authenticate_session(config[f'{tenant}']['api_key'],
-    #                                             config[f'{tenant}']['username'],
-    #                                             config[f'{tenant}']['password'],
-    #                                             config[f'{tenant}']['baseUrl']
-    #                                             )
-
-    #     child_fw_ruleset = build_child_fw_ruleset(child_session,
-    #                                                 config[f'{tenant}']['baseUrl'],
-    #                                                 parent_fw_policy,
-    #                                                 get_tenant_nwServices(child_session,
-    #                                                                     config[f'{tenant}']['baseUrl']))
-    #     print(child_fw_ruleset)
