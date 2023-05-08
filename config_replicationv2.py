@@ -10,7 +10,7 @@ import sys
 from icecream import ic
 
 # Enable IC debugging
-ic.enable()
+ic.disable()
 
 # Load TOML config file
 with open('config.toml', "rb") as cf:
@@ -208,6 +208,11 @@ def apply_child_fw_ruleset(session, baseUrl: str, fw_ruleset):
                  data="", headers=headers).json()
 
 
+def apply_child_url_blacklist(session, baseUrl: str, url_blacklist: list):
+    return session.post(f"{baseUrl}security/advanced/blacklistUrls", headers=headers,
+                        data=json.dumps(url_blacklist))
+
+
 if __name__ == "__main__":
     run_count = 0
     changes = False
@@ -252,6 +257,11 @@ if __name__ == "__main__":
                 apply_child_fw_ruleset(child_session,
                                        config[f'{tenant}']['baseUrl'],
                                        child_fw_ruleset)
+
+                apply_child_url_blacklist(child_session,
+                                          config[f'{tenant}']['baseUrl'],
+                                          parent_url_bl_policy)
+
                 print(f"Configuration Sync Complete for tenant {tenant}.")
             print("Full Configuration Sync Complete.")
             run_count += 1
