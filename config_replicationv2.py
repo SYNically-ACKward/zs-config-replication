@@ -272,12 +272,9 @@ if __name__ == "__main__":
             print("Full Configuration Sync Complete.")
             run_count += 1
             hold_timer(300)
-            # time.sleep(300)
+
         else:
             if run_count > 0:
                 run_count += 1
                 print(f"No changes have been detected. This is run number {run_count}.")
             hold_timer(300)
-            # time.sleep(300)
-
-    # TESTING BLOCK
