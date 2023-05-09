@@ -7,6 +7,7 @@ import copy
 import datetime
 import tomli
 import sys
+from tqdm import tqdm
 from icecream import ic
 
 # Enable IC debugging
@@ -213,6 +214,11 @@ def apply_child_url_blacklist(session, baseUrl: str, url_blacklist: list):
                         data=json.dumps(url_blacklist))
 
 
+def hold_timer(duration: int):
+    for i in tqdm(range(duration), desc="Next Run In", unit="sec"):
+        time.sleep(1)
+
+
 if __name__ == "__main__":
     run_count = 0
     changes = False
@@ -262,15 +268,16 @@ if __name__ == "__main__":
                                           config[f'{tenant}']['baseUrl'],
                                           parent_url_bl_policy)
 
-                print(f"Configuration Sync Complete for tenant {tenant}.")
+                print(f"Configuration Sync Complete for tenant {tenant}.\n")
             print("Full Configuration Sync Complete.")
             run_count += 1
-            time.sleep(300)
+            hold_timer(300)
+            # time.sleep(300)
         else:
             if run_count > 0:
                 run_count += 1
                 print(f"No changes have been detected. This is run number {run_count}.")
-
-            time.sleep(300)
+            hold_timer(300)
+            # time.sleep(300)
 
     # TESTING BLOCK
