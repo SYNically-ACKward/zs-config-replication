@@ -7,6 +7,7 @@ import copy
 import datetime
 import tomli
 import sys
+import os
 from icecream import ic
 from tqdm import tqdm  # Import the tqdm library for displaying progress bars
 
@@ -15,7 +16,10 @@ from tqdm import tqdm  # Import the tqdm library for displaying progress bars
 ic.disable()
 
 # Load TOML config file
-with open('config.toml', "rb") as cf:
+script_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(script_dir, "config.toml")
+
+with open(config_path, "rb") as cf:
     config = tomli.load(cf)
 
 
