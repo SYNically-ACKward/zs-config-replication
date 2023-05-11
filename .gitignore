@@ -164,6 +164,8 @@ cython_debug/
 
 # Scratch Files
 scratch.py
-archive/*
+archive/
+.vscode/
+.github/
 Pipfile
 Pipfile.lock
