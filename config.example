@@ -5,6 +5,7 @@ scope = ""
 token_url = ""
 
 [PARENT]
+cloudId = "zscaler.net"
 baseUrl = ""
 api_key = "
 username = ""

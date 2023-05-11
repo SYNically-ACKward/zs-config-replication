@@ -123,7 +123,7 @@ def hold_timer(duration: int):
 
 
 if __name__ == "__main__":
-    run_count = 1
+    run_count = 0
     changes = False
     while True:
         parent = ZiaTalker(f"{config['PARENT']['cloudId']}")
