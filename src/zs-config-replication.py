@@ -12,7 +12,7 @@ from tqdm import tqdm  # Import the tqdm library for displaying progress bars
 
 
 # Enable IC debugging
-ic.enable()
+ic.disable()
 
 # Load TOML config file
 with open('config.toml', "rb") as cf:
