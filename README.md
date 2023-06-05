@@ -1,6 +1,6 @@
 # Config Replication v3
 
-Config Replication v3 is a Python script designed to synchronize firewall and security configurations between a parent organization and its child tenants. It allows for the automatic replication of configuration changes from the parent organization to each child tenant, ensuring consistency across multiple environments.
+Config Replication is a Python script designed to synchronize firewall and security configurations between a parent organization and its child tenants. It allows for the automatic replication of configuration changes from the parent organization to each child tenant, ensuring consistency across multiple environments.
 
 ## Installation
 
@@ -23,7 +23,7 @@ pip install -r requirements.txt
 2. Run the script:
 
 ```shell
-python config_replicationv3.py
+python zs_config_replication.py
 ```
 
 The script will authenticate the parent organization, check for configuration changes, and apply those changes to the child tenants' configurations.

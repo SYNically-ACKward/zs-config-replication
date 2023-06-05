@@ -20,4 +20,3 @@ def test_config_file_exists(config):
     assert "PARENT" in config
     assert "SUB1" in config
     assert "SUB2" in config
-
