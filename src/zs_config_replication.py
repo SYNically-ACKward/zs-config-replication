@@ -76,16 +76,14 @@ def build_child_fw_ruleset(policy: dict) -> list:
             if 'labels' in rule:
                 child_labels = child.list_rule_labels()
                 for rule_label in rule['labels']:
-                    print(rule_label['name'])
-                    print(rule_label['name'] != 'pscm-low')
-                    if rule_label['name'] != 'pscm-high' or 'pscm-low':
-                        logging.warning(f'''An invalid rule label was present in
-                                        Rule: {rule['name']}. This label, {rule['labels']} will be removed.''')
-                        del rule['labels']
-                    else:
+                    if rule_label['name'] == 'pscm-high' or 'pscm-low':
                         for label in child_labels:
                             if label['name'] == rule_label['name']:
                                 rule_label['id'] = label['id']
+                    else:
+                        del rule['labels']
+                        logging.warning(f'''An invalid rule label was present in
+                                        Rule: {rule['name']}. This label, {rule['labels']} will be removed.''')
             if 'nwServices' in rule:
                 nwServices = child.list_networkServices()
                 for nwService in rule['nwServices']:
