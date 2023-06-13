@@ -8,6 +8,8 @@ import datetime
 import tomli
 import sys
 import os
+import sqlite3
+from sqlite3 import Error
 from icecream import ic
 from tqdm import tqdm  # Import the tqdm library for displaying progress bars
 
@@ -31,7 +33,7 @@ def check_for_changes():
     while True:
         report_status = parent.list_auditlogEntryReport()
         if report_status['status'] == 'ERRORED':
-            print("Error retrieving change report. Exiting Application.")
+            logging.error("Error retrieving change report. Exiting Application.")
             sys.exit("Gathering Change Report Failed.")
         elif report_status['status'] == 'COMPLETE':
             break
@@ -54,45 +56,33 @@ def check_for_changes():
 def gather_parent_config():
     configuration = {}
     configuration['fw'] = parent.list_firewallFilteringRules()
+    for rule in configuration['fw']:
+        parent_db.execute(
+            '''INSERT INTO FirewallRules (id, name, action, destCountries, destIpCategories, labels, nwServices, rank, description, enableFullLogging, `order`, state)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (
+                rule['id'],
+                rule['name'],
+                rule['action'],
+                str(rule['destCountries']),
+                str(rule.get('destIpCategories')),
+                str(rule.get('labels')),
+                str(rule.get('nwServices')),
+                rule.get('rank'),
+                rule.get('description'),
+                rule['enableFullLogging'],
+                rule['order'],
+                rule['state']
+            )
+        )
     configuration['url_bl'] = parent.list_security_blacklisted_urls()
+    parent_db.commit()
     return configuration
 
 
 def build_child_fw_ruleset(policy: dict) -> list:
     parent_policy = copy.deepcopy(policy)
     new_ruleset = []
-    for rule in parent_policy['fw']:  # Iterate through each rule in the parent policy
-        if rule['name'] in [i['name'] for i in child.list_firewallFilteringRules()]:
-            print(f"Rule {rule['name']} already exists at location {rule['order']}.")
-            pass
-        else:  # Otherwise, add the rule to the child policy
-            del rule['id']
-            if 'destIpCategories' in rule is not []:
-                logging.warning(f'''Rule {rule['name']} references a
-                                Destination IP Category that may
-                                not be present in child tenants.
-                                This criteria will be removed.''')
-                del rule['destIpCategories']
-            if 'labels' in rule:
-                child_labels = child.list_rule_labels()
-                for rule_label in rule['labels']:
-                    if rule_label['name'] == 'pscm-high' or 'pscm-low':
-                        for label in child_labels:
-                            if label['name'] == rule_label['name']:
-                                rule_label['id'] = label['id']
-                    else:
-                        del rule['labels']
-                        logging.warning(f'''An invalid rule label was present in
-                                        Rule: {rule['name']}. This label, {rule['labels']} will be removed.''')
-            if 'nwServices' in rule:
-                nwServices = child.list_networkServices()
-                for nwService in rule['nwServices']:
-                    for service in nwServices:
-                        if service['name'] == nwService['name']:
-                            nwService['id'] = service['id']
-            logging.info(f"New rule with name {rule['name']} will be created in position {rule['order']}.")
-            print(f"New rule with name {rule['name']} will be created in position {rule['order']}.")
-            new_ruleset.append(rule)
     return sorted(new_ruleset, key=lambda x: x['order'])  # Sort the new policy by rule order
 
 
@@ -102,9 +92,9 @@ def apply_child_fw_ruleset(fw_ruleset):
         time.sleep(1)
         ic(response.json())
         if 'code' in response.content.decode():
-            print(f"Error with Rule Name: {rule['name']} for tenant {tenant}")
-            print(f"Error: {response.json()['code']}")
-            print(f"Error: {response.json()['message']}")
+            logging.error(f"Error with Rule Name: {rule['name']} for tenant {tenant}")
+            logging.error(f"Error: {response.json()['code']}")
+            logging.error(f"Error: {response.json()['message']}")
     child.activate_status()
 
 
@@ -135,9 +125,35 @@ def hold_timer(duration: int):
         time.sleep(1)
 
 
+def create_db_connection(path):
+    connection = None
+    try:
+        connection = sqlite3.connect(path)
+        logging.info("Connection to SQLite DB Successful.")
+    except Error as e:
+        logging.error(f"The error '{e}' occurred.")
+    
+    return connection
+
+
 if __name__ == "__main__":
     run_count = 0
     changes = False
+    parent_db = create_db_connection('db/parent.db')
+    parent_db.execute('''CREATE TABLE FirewallRules (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    action TEXT,
+    destCountries TEXT,
+    destIpCategories TEXT,
+    labels TEXT,
+    nwServices TEXT,
+    rank INTEGER,
+    description TEXT,
+    enableFullLogging INTEGER,
+    `order` INTEGER,
+    state TEXT
+    )''')
     while True:
         parent = ZiaTalker(f"{config['PARENT']['cloudId']}")
         parent.authenticate(config['PARENT']['api_key'],
@@ -147,9 +163,9 @@ if __name__ == "__main__":
         parent_config = gather_parent_config()
         if changes or run_count == 0:
             if run_count == 0:
-                print("This is the inital run. Proceeding with configuration sync...")
+                logging.info("This is the inital run. Proceeding with configuration sync.")
             else:
-                print("Changes have been detected. Proceeding with configuration sync...")
+                logging.info("Changes have been detected. Proceeding with configuration sync...")
 
             for tenant in [key for key in config.keys() if 'SUB' in key]:
                 child = ZiaTalker(f"{config[f'{tenant}']['cloudId']}")
@@ -162,18 +178,18 @@ if __name__ == "__main__":
 
                 child_fw_ruleset = build_child_fw_ruleset(parent_config)
 
-                apply_child_fw_ruleset(child_fw_ruleset)
+                # apply_child_fw_ruleset(child_fw_ruleset)
 
-                apply_child_url_bl(parent_config['url_bl'])
+                # apply_child_url_bl(parent_config['url_bl'])
 
-                print(f"Configuration Sync Complete for tenant {tenant}.\n")
+                logging.info(f"Configuration Sync Complete for tenant {tenant}.\n")
 
-            print("Full Configuration Sync Complete.")
+            logging.info("Full Configuration Sync Complete.")
             run_count += 1
             hold_timer(300)
 
         else:
             if run_count > 0:
                 run_count += 1
-                print(f"No changes have been detected in the last 360 seconds. This is run number {run_count}.")
+                logging.info(f"No changes have been detected in the last 360 seconds. This is run number {run_count}.")
             hold_timer(300)

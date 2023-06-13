@@ -170,3 +170,4 @@ archive/
 Pipfile
 Pipfile.lock
 .DS_Store
+*.db
