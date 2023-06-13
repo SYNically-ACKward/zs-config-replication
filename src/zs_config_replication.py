@@ -67,7 +67,7 @@ def build_child_fw_ruleset(policy: dict) -> list:
             pass
         else:  # Otherwise, add the rule to the child policy
             del rule['id']
-            if 'destIpCategories' in rule:
+            if 'destIpCategories' in rule is not []:
                 logging.warning(f'''Rule {rule['name']} references a
                                 Destination IP Category that may
                                 not be present in child tenants.
@@ -106,6 +106,10 @@ def apply_child_fw_ruleset(fw_ruleset):
             print(f"Error: {response.json()['code']}")
             print(f"Error: {response.json()['message']}")
     child.activate_status()
+
+
+def apply_child_url_bl(url_blacklist):
+    child.add_security_blacklistUrls(url_blacklist)
 
 
 def validate_tenant_labels():
@@ -159,6 +163,8 @@ if __name__ == "__main__":
                 child_fw_ruleset = build_child_fw_ruleset(parent_config)
 
                 apply_child_fw_ruleset(child_fw_ruleset)
+
+                apply_child_url_bl(parent_config['url_bl'])
 
                 print(f"Configuration Sync Complete for tenant {tenant}.\n")
 
