@@ -1,19 +1,21 @@
-from zia_talker.zia_talker import ZiaTalker
-import logging
-import time
 import csv
-import io
-import copy
 import datetime
-import tomli
-import sys
+import io
+import json
+import logging
 import os
 import shutil
 import sqlite3
-import json
+import sys
+import time
 from sqlite3 import Error
+
+import tomli
 from icecream import ic
-from tqdm import tqdm  # Import the tqdm library for displaying progress bars
+from tqdm import tqdm 
+
+from zia_talker.zia_talker import ZiaTalker
+
 
 
 # Enable IC debugging
@@ -121,9 +123,41 @@ def read_config_from_db(tenantId: str, conf_type: str, run_count: int) -> list:
     configuration = c.fetchall()
     return configuration
 
+import json
 
-# def compare_config(config_1: list, config_2: list) -> bool:
+def id_changed_rules(old_parent_policy: list, new_parent_policy: list):
+    if old_parent_policy and isinstance(old_parent_policy[0], tuple):
+        old_parent_policy = json.loads(old_parent_policy[0][0])
 
+    if new_parent_policy and isinstance(new_parent_policy[0], tuple):
+        new_parent_policy = json.loads(new_parent_policy[0][0])
+
+    new_parent_policy_dict = {rule['id']: rule for rule in new_parent_policy}
+
+    changed_rules = []
+
+    for rule in old_parent_policy:
+        if rule['id'] in new_parent_policy_dict and not deep_equal(rule, new_parent_policy_dict[rule['id']]):
+            changed_rules.append(rule['id'])
+
+    return changed_rules
+
+def build_child_fw_rules():
+    changes = id_changed_rules(read_config_from_db("PARENT", "FW", run_count),
+                               read_config_from_db("PARENT", "FW", (run_count-1)))
+
+
+def write_to_children(parent_configuration):
+    for tenant in [key for key in config.keys() if 'SUB' in key]:
+        child_configuration = {}
+        child = ZiaTalker(f"{config[f'{tenant}']['cloudId']}")
+        child.authenticate(config[f'{tenant}']['api_key'],
+                            config[f'{tenant}']['username'],
+                            config[f'{tenant}']['password'])
+        child_configuration['FW Filtering'] = build_child_fw_rules(parent_configuration['FW Filtering'])
+        # Write to DB at the end before return
+        write_config_to_db(tenant, child_configuration)
+        
 def deep_equal(obj1, obj2):
     if type(obj1) != type(obj2):
         return False
@@ -175,13 +209,21 @@ if __name__ == "__main__":
     run_count = 0
     while True:
         if run_count == 0:
-            logging.info(f"First run started at {time.time()}.")
+            logging.debug(f"First run started.")
             parent_configuration = read_configuration("PARENT")
             write_config_to_db("PARENT", parent_configuration)
+            # write_to_children(parent_configuration)
             run_count += 1
         elif run_count > 0:
-            time.sleep(30)
-            parent_configuration = read_configuration("PARENT")
-            write_config_to_db("PARENT", parent_configuration)
-            ic(deep_equal(read_config_from_db("PARENT", "FW", run_count), read_config_from_db("PARENT", "FW", (run_count-1))))
+            if check_for_changes("PARENT"):
+                parent_configuration = read_configuration("PARENT")
+                write_config_to_db("PARENT", parent_configuration)
+                ic(id_changed_rules(read_config_from_db("PARENT", "FW", run_count), read_config_from_db("PARENT", "FW", (run_count-1))))
+                # ic(deep_equal(read_config_from_db("PARENT", "FW", run_count), read_config_from_db("PARENT", "FW", (run_count-1))))
+                # Insert write policies to child tenant - If clause needed for if to update previusly created rules or not
+                # How to avoid rewriting entire ruleset each time a new rule is created
+                # write_to_children(parent_configuration)
+            else:
+                logging.debug(f"No changes detected for run count {run_count}. Sleeping for five minutes.")
+                time.sleep(30)
             run_count += 1
